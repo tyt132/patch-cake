@@ -84,10 +84,15 @@ def start_local_ollama():
     except Exception:
         pass
 
+    # Force CPU-only mode to avoid GPU scheduler assertion (GGML_SCHED_MAX_SPLIT_INP)
+    # on machines with AMD/mixed GPU setups where Ollama's CPU+GPU offload split crashes.
+    _ollama_env = {**os.environ, 'OLLAMA_NUM_GPU': '0'}
+
     # 2. Try starting it if ollama command exists
     print("[Ollama] Port 11434 is closed. Attempting to start local Ollama...")
     try:
-        subprocess.Popen(["ollama", "serve"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.Popen(["ollama", "serve"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                         env=_ollama_env)
         for _ in range(5):
             time.sleep(1)
             try:
@@ -117,7 +122,8 @@ def start_local_ollama():
                 print(f"[Ollama Error] Failed to download macOS binary: {e}")
                 return
         print("[Ollama] Starting local Ollama daemon from local bin...")
-        subprocess.Popen([str(ollama_bin), "serve"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.Popen([str(ollama_bin), "serve"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                         env=_ollama_env)
 
     elif platform == "win32":
         ollama_bin = bin_dir / "ollama.exe"
@@ -136,7 +142,8 @@ def start_local_ollama():
                 print(f"[Ollama Error] Failed to set up Windows standalone Ollama: {e}")
                 return
         print("[Ollama] Starting local Ollama daemon from local bin...")
-        subprocess.Popen([str(ollama_bin), "serve"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.Popen([str(ollama_bin), "serve"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                         env=_ollama_env)
 
     # Wait for Ollama startup confirmation
     for _ in range(15):

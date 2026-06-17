@@ -1,5 +1,5 @@
 {
-  "server_version": "1.0.1",
+  "server_version": "1.0.2",
   "launcher_version": "1.0.0",
-  "release_notes": "uvicorn reload 비활성화 — 로그 캡처 및 Ollama 시작 안정성 개선"
+  "release_notes": "OLLAMA_NUM_GPU=0 강제 적용 — AMD GPU 탑재 노트북 AI 크래시 수정"
 }
