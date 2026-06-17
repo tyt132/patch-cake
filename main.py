@@ -21,6 +21,8 @@ from stt_service import transcribe_audio
 UPLOAD_DIR = Path("./uploads/stt")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
+_amd_gpu_unsupported = False  # set True when AMD GPU detected — AI features disabled
+
 ALLOWED_ORIGINS = [
     "https://sths-sms.vercel.app",
     "http://localhost:5173",
@@ -75,30 +77,27 @@ def start_local_ollama():
         except Exception as e:
             print(f"[Ollama Error] Failed to pull model via subprocess CLI: {e}")
 
-    def _detect_amd_gpu() -> bool:
-        """Return True if an AMD/Radeon GPU is detected on Windows."""
+    global _amd_gpu_unsupported
+
+    # Detect AMD GPU on Windows — AI features are unsupported due to Ollama GGML crash
+    if sys.platform == 'win32':
         try:
             r = subprocess.run(
                 ['wmic', 'path', 'win32_VideoController', 'get', 'name'],
                 capture_output=True, text=True, creationflags=0x08000000
             )
-            output = r.stdout.lower()
-            return 'amd' in output or 'radeon' in output
+            if 'amd' in r.stdout.lower() or 'radeon' in r.stdout.lower():
+                _amd_gpu_unsupported = True
+                print("[AI] AMD/Radeon GPU 감지 — AI 기능이 이 GPU에서 지원되지 않습니다.")
+                print("[AI] STT(음성인식) 기능은 정상 이용 가능합니다.")
+                return
         except Exception:
-            return False
+            pass
 
     _ollama_env = {**os.environ, 'OLLAMA_NUM_GPU': '0'}
 
-    # 1. On Windows, kill any existing Ollama so safe env vars take effect on restart.
+    # Kill any existing Ollama before starting to ensure our env vars apply
     if sys.platform == 'win32':
-        if _detect_amd_gpu():
-            # OLLAMA_NUM_GPU=0 is not enough: GGML scheduler still detects the AMD GPU
-            # device and triggers GGML_SCHED_MAX_SPLIT_INP mid-inference.
-            # OLLAMA_LLM_LIBRARY=cpu forces the CPU runner directly, skipping GPU init.
-            _ollama_env['OLLAMA_LLM_LIBRARY'] = 'cpu'
-            _ollama_env['ROCR_VISIBLE_DEVICES'] = '-1'
-            _ollama_env['HIP_VISIBLE_DEVICES'] = '-1'
-            print("[Ollama] AMD GPU detected — forcing CPU-only runtime (OLLAMA_LLM_LIBRARY=cpu).")
         try:
             subprocess.run(
                 ['taskkill', '/F', '/IM', 'ollama.exe'],
@@ -246,6 +245,12 @@ async def transcribe(
 
 @app.get("/api/ai/status")
 def ai_status():
+    if _amd_gpu_unsupported:
+        return {
+            "ollama_running": False,
+            "has_model": False,
+            "error": "AMD/Radeon GPU는 AI 기능을 지원하지 않습니다. STT 기능은 정상 이용 가능합니다."
+        }
     try:
         req = urllib.request.Request("http://localhost:11434/api/tags")
         with urllib.request.urlopen(req, timeout=2) as response:
@@ -290,6 +295,11 @@ def ai_pull():
 
 @app.post("/api/ai/analyze")
 def ai_analyze(payload: AnalyzeRequest):
+    if _amd_gpu_unsupported:
+        def _unsupported():
+            yield (json.dumps({"error": "AMD/Radeon GPU는 AI 기능을 지원하지 않습니다."}) + "\n").encode("utf-8")
+        return StreamingResponse(_unsupported(), media_type="application/x-ndjson")
+
     prompt = f"""당신은 전문적인 학교 상담 교사입니다. 다음 상담 기록 대화 요지 및 관찰 내용을 바탕으로 두 가지를 작성해 주세요.
 1. 상담 요약 (핵심적인 내용을 3~4개의 글머리 기호 문장으로 요약)
 2. 추후 지도 계획 (Action Plan) (구체적이고 실천 가능한 학생 관리 및 지도 방안을 2~3개 제시)

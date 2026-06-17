@@ -1,5 +1,5 @@
 {
   "server_version": "1.0.5",
   "launcher_version": "1.0.1",
-  "release_notes": "AMD GPU 감지 시 OLLAMA_LLM_LIBRARY=cpu 강제 적용 — CPU 런타임 직접 지정으로 GGML 스케줄러 우회"
+  "release_notes": "AMD/Radeon GPU 미지원 처리 — 감지 시 AI 기능 비활성화, STT는 정상 동작"
 }
