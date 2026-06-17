@@ -95,20 +95,35 @@ def _init_llama_cpp():
         print("[AMD-AI] llama-cpp-python 이미 설치됨.")
     except ImportError:
         print("[AMD-AI] llama-cpp-python 설치 중 (최초 1회)...")
+        installed = False
+        # Try 1: PyPI pre-built binary (Windows CPU wheel available on PyPI)
         try:
             subprocess.run(
-                [
-                    sys.executable, '-m', 'pip', 'install',
-                    'llama-cpp-python',
-                    '--extra-index-url',
-                    'https://abetlen.github.io/llama-cpp-python/whl/cpu',
-                    '--quiet',
-                ],
+                [sys.executable, '-m', 'pip', 'install',
+                 'llama-cpp-python', '--only-binary', ':all:', '--quiet'],
                 check=True,
             )
-            print("[AMD-AI] llama-cpp-python 설치 완료.")
-        except Exception as e:
-            print(f"[AMD-AI Error] 설치 실패: {e}")
+            installed = True
+            print("[AMD-AI] llama-cpp-python 설치 완료 (PyPI binary).")
+        except Exception as e1:
+            print(f"[AMD-AI] PyPI binary 실패: {e1}")
+        # Try 2: CPU-specific wheel index
+        if not installed:
+            try:
+                subprocess.run(
+                    [sys.executable, '-m', 'pip', 'install',
+                     'llama-cpp-python',
+                     '--extra-index-url',
+                     'https://abetlen.github.io/llama-cpp-python/whl/cpu',
+                     '--quiet'],
+                    check=True,
+                )
+                installed = True
+                print("[AMD-AI] llama-cpp-python 설치 완료 (CPU index).")
+            except Exception as e2:
+                print(f"[AMD-AI] CPU index 실패: {e2}")
+        if not installed:
+            print("[AMD-AI Error] llama-cpp-python 설치 실패. AI 기능을 사용할 수 없습니다.")
             return
 
     # 2. Download GGUF model if not present

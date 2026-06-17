@@ -1,5 +1,5 @@
 {
-  "server_version": "1.0.7",
+  "server_version": "1.0.8",
   "launcher_version": "1.0.1",
-  "release_notes": "AMD 감지 강화 — wmic 실패 시 PowerShell/드라이버 폴더 폴백 추가"
+  "release_notes": "llama-cpp-python 설치 방법 개선 — PyPI binary 우선 시도 후 CPU 인덱스 폴백"
 }
