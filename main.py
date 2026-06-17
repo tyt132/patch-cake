@@ -319,5 +319,25 @@ def ai_analyze(payload: AnalyzeRequest):
 
 
 if __name__ == "__main__":
+    # Kill any stale process holding port 8000 before uvicorn binds (prevents Errno 10048 after auto-patch restart)
+    if sys.platform == 'win32':
+        try:
+            _r = subprocess.run(
+                ['netstat', '-ano'], capture_output=True, text=True,
+                creationflags=0x08000000  # CREATE_NO_WINDOW
+            )
+            _my_pid = str(os.getpid())
+            for _line in _r.stdout.splitlines():
+                if ':8000 ' in _line and 'LISTENING' in _line:
+                    _pid = _line.split()[-1]
+                    if _pid.isdigit() and _pid != _my_pid:
+                        subprocess.run(
+                            ['taskkill', '/F', '/PID', _pid],
+                            capture_output=True, creationflags=0x08000000
+                        )
+                        print(f"[Startup] Killed stale process on port 8000 (PID {_pid})")
+                        time.sleep(0.5)
+        except Exception:
+            pass
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8000, log_level="warning", reload=False)

@@ -1,5 +1,5 @@
 {
-  "server_version": "1.0.2",
-  "launcher_version": "1.0.0",
-  "release_notes": "OLLAMA_NUM_GPU=0 강제 적용 — AMD GPU 탑재 노트북 AI 크래시 수정"
+  "server_version": "1.0.3",
+  "launcher_version": "1.0.1",
+  "release_notes": "Errno 10048 완전 수정 — 서버 재시작 전 포트 8000 선점 프로세스 자동 종료"
 }
