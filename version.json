@@ -1,5 +1,5 @@
 {
-  "server_version": "1.0.0",
+  "server_version": "1.0.1",
   "launcher_version": "1.0.0",
-  "release_notes": "초기 릴리스"
+  "release_notes": "uvicorn reload 비활성화 — 로그 캡처 및 Ollama 시작 안정성 개선"
 }
