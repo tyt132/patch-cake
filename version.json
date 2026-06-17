@@ -1,5 +1,5 @@
 {
-  "server_version": "1.0.6",
+  "server_version": "1.0.7",
   "launcher_version": "1.0.1",
-  "release_notes": "AMD GPU 전용 llama-cpp-python CPU 경로 추가 — Qwen2.5-1.5B 모델 자동 다운로드 후 로컬 추론"
+  "release_notes": "AMD 감지 강화 — wmic 실패 시 PowerShell/드라이버 폴더 폴백 추가"
 }

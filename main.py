@@ -46,15 +46,44 @@ ALLOWED_ORIGINS = [
 def _detect_amd() -> bool:
     if sys.platform != 'win32':
         return False
+
+    def _check(output: str) -> bool:
+        low = output.lower()
+        return 'amd' in low or 'radeon' in low
+
+    # Method 1: wmic
     try:
         r = subprocess.run(
             ['wmic', 'path', 'win32_VideoController', 'get', 'name'],
-            capture_output=True, text=True, creationflags=0x08000000
+            capture_output=True, text=True, creationflags=0x08000000, timeout=5
         )
-        output = r.stdout.lower()
-        return 'amd' in output or 'radeon' in output
-    except Exception:
-        return False
+        print(f"[AI] GPU 감지 (wmic): {r.stdout.strip()}")
+        if r.stdout.strip():
+            if _check(r.stdout):
+                return True
+    except Exception as e:
+        print(f"[AI] wmic 실패: {e}")
+
+    # Method 2: PowerShell fallback
+    try:
+        r = subprocess.run(
+            ['powershell', '-NoProfile', '-Command',
+             'Get-WmiObject Win32_VideoController | Select-Object -ExpandProperty Name'],
+            capture_output=True, text=True, creationflags=0x08000000, timeout=8
+        )
+        print(f"[AI] GPU 감지 (PS): {r.stdout.strip()}")
+        if _check(r.stdout):
+            return True
+    except Exception as e:
+        print(f"[AI] PowerShell 실패: {e}")
+
+    # Method 3: AMD driver folder
+    for folder in [Path("C:/Program Files/AMD"), Path("C:/Program Files (x86)/AMD")]:
+        if folder.exists():
+            print(f"[AI] AMD 드라이버 폴더 감지: {folder}")
+            return True
+
+    return False
 
 
 def _init_llama_cpp():
