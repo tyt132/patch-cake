@@ -1,5 +1,5 @@
 {
-  "server_version": "1.0.4",
+  "server_version": "1.0.5",
   "launcher_version": "1.0.1",
-  "release_notes": "AMD GPU 완전 비활성화 — ROCR/HIP 드라이버 레벨에서 GPU 숨김, 생성 중 500 크래시 수정"
+  "release_notes": "AMD GPU 감지 시 OLLAMA_LLM_LIBRARY=cpu 강제 적용 — CPU 런타임 직접 지정으로 GGML 스케줄러 우회"
 }

@@ -75,26 +75,35 @@ def start_local_ollama():
         except Exception as e:
             print(f"[Ollama Error] Failed to pull model via subprocess CLI: {e}")
 
-    # AMD GPU safety: set env vars that completely hide the GPU from ROCm/HIP stack.
-    # OLLAMA_NUM_GPU=0 alone is insufficient — GGML scheduler still detects the GPU
-    # device and attempts CPU+GPU splits mid-inference, triggering GGML_SCHED_MAX_SPLIT_INP.
-    # ROCR/HIP vars make the GPU invisible at the driver level before Ollama initializes.
-    _ollama_env = {
-        **os.environ,
-        'OLLAMA_NUM_GPU': '0',
-        'ROCR_VISIBLE_DEVICES': '-1',   # hide GPU from AMD ROCm runtime
-        'HIP_VISIBLE_DEVICES': '-1',    # hide GPU from AMD HIP runtime
-    }
+    def _detect_amd_gpu() -> bool:
+        """Return True if an AMD/Radeon GPU is detected on Windows."""
+        try:
+            r = subprocess.run(
+                ['wmic', 'path', 'win32_VideoController', 'get', 'name'],
+                capture_output=True, text=True, creationflags=0x08000000
+            )
+            output = r.stdout.lower()
+            return 'amd' in output or 'radeon' in output
+        except Exception:
+            return False
 
-    # 1. On Windows, kill any existing Ollama and restart with safe env vars.
-    #    "Already running" Ollama may have been started without the AMD-safe vars.
+    _ollama_env = {**os.environ, 'OLLAMA_NUM_GPU': '0'}
+
+    # 1. On Windows, kill any existing Ollama so safe env vars take effect on restart.
     if sys.platform == 'win32':
+        if _detect_amd_gpu():
+            # OLLAMA_NUM_GPU=0 is not enough: GGML scheduler still detects the AMD GPU
+            # device and triggers GGML_SCHED_MAX_SPLIT_INP mid-inference.
+            # OLLAMA_LLM_LIBRARY=cpu forces the CPU runner directly, skipping GPU init.
+            _ollama_env['OLLAMA_LLM_LIBRARY'] = 'cpu'
+            _ollama_env['ROCR_VISIBLE_DEVICES'] = '-1'
+            _ollama_env['HIP_VISIBLE_DEVICES'] = '-1'
+            print("[Ollama] AMD GPU detected — forcing CPU-only runtime (OLLAMA_LLM_LIBRARY=cpu).")
         try:
             subprocess.run(
                 ['taskkill', '/F', '/IM', 'ollama.exe'],
                 capture_output=True, creationflags=0x08000000
             )
-            print("[Ollama] Stopped existing Ollama process (restarting with AMD-safe env).")
             time.sleep(1)
         except Exception:
             pass
