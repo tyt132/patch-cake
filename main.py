@@ -75,7 +75,31 @@ def start_local_ollama():
         except Exception as e:
             print(f"[Ollama Error] Failed to pull model via subprocess CLI: {e}")
 
-    # 1. Check if Ollama port is already open
+    # AMD GPU safety: set env vars that completely hide the GPU from ROCm/HIP stack.
+    # OLLAMA_NUM_GPU=0 alone is insufficient — GGML scheduler still detects the GPU
+    # device and attempts CPU+GPU splits mid-inference, triggering GGML_SCHED_MAX_SPLIT_INP.
+    # ROCR/HIP vars make the GPU invisible at the driver level before Ollama initializes.
+    _ollama_env = {
+        **os.environ,
+        'OLLAMA_NUM_GPU': '0',
+        'ROCR_VISIBLE_DEVICES': '-1',   # hide GPU from AMD ROCm runtime
+        'HIP_VISIBLE_DEVICES': '-1',    # hide GPU from AMD HIP runtime
+    }
+
+    # 1. On Windows, kill any existing Ollama and restart with safe env vars.
+    #    "Already running" Ollama may have been started without the AMD-safe vars.
+    if sys.platform == 'win32':
+        try:
+            subprocess.run(
+                ['taskkill', '/F', '/IM', 'ollama.exe'],
+                capture_output=True, creationflags=0x08000000
+            )
+            print("[Ollama] Stopped existing Ollama process (restarting with AMD-safe env).")
+            time.sleep(1)
+        except Exception:
+            pass
+
+    # Check port after potential kill
     try:
         with urllib.request.urlopen("http://localhost:11434/", timeout=1) as response:
             print("[Ollama] Service is already running.")
@@ -83,10 +107,6 @@ def start_local_ollama():
             return
     except Exception:
         pass
-
-    # Force CPU-only mode to avoid GPU scheduler assertion (GGML_SCHED_MAX_SPLIT_INP)
-    # on machines with AMD/mixed GPU setups where Ollama's CPU+GPU offload split crashes.
-    _ollama_env = {**os.environ, 'OLLAMA_NUM_GPU': '0'}
 
     # 2. Try starting it if ollama command exists
     print("[Ollama] Port 11434 is closed. Attempting to start local Ollama...")

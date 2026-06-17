@@ -1,5 +1,5 @@
 {
-  "server_version": "1.0.3",
+  "server_version": "1.0.4",
   "launcher_version": "1.0.1",
-  "release_notes": "Errno 10048 완전 수정 — 서버 재시작 전 포트 8000 선점 프로세스 자동 종료"
+  "release_notes": "AMD GPU 완전 비활성화 — ROCR/HIP 드라이버 레벨에서 GPU 숨김, 생성 중 500 크래시 수정"
 }
