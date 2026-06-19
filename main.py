@@ -397,4 +397,6 @@ if __name__ == "__main__":
         except Exception:
             pass
     import uvicorn
+    import logging
+    logging.getLogger("asyncio").setLevel(logging.CRITICAL)
     uvicorn.run("main:app", host="0.0.0.0", port=8000, log_level="warning", reload=False)

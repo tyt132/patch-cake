@@ -1,5 +1,5 @@
 {
-  "server_version": "1.1.0",
-  "launcher_version": "1.0.6",
-  "release_notes": "바탕화면 바로가기 수정: OneDrive 등 경로 리다이렉션 환경 대응, pip SSL 우회"
+  "server_version": "1.1.1",
+  "launcher_version": "1.0.7",
+  "release_notes": "로그 한글 깨짐 수정(PYTHONIOENCODING), asyncio 연결 종료 에러 로그 제거"
 }
