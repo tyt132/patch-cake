@@ -1,5 +1,5 @@
 {
   "server_version": "1.1.1",
-  "launcher_version": "1.0.7",
-  "release_notes": "로그 한글 깨짐 수정(PYTHONIOENCODING), asyncio 연결 종료 에러 로그 제거"
+  "launcher_version": "1.0.8",
+  "release_notes": "Python 자동설치 폴백: TargetDir 무시 시 기본경로 스캔, 에러 메시지 개선"
 }
