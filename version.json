@@ -1,5 +1,5 @@
 {
   "server_version": "1.1.2",
-  "launcher_version": "1.1.0",
-  "release_notes": "NVIDIA GPU 복구: OLLAMA_NUM_GPU=0 제거로 GPU 가속 정상 작동"
+  "launcher_version": "1.1.1",
+  "release_notes": "stt_service.py EXE 번들 내장, 패치 후 서버 항상 재시작 수정"
 }
