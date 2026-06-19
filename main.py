@@ -76,6 +76,34 @@ def _detect_amd() -> bool:
     return False
 
 
+def _set_gpu_high_perf(exe_path: str):
+    """Register exe for high-performance (discrete) GPU via Windows per-app setting."""
+    try:
+        import winreg
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER,
+                r'Software\Microsoft\DirectX\UserGpuPreferences',
+                0, winreg.KEY_SET_VALUE) as k:
+            winreg.SetValueEx(k, exe_path, 0, winreg.REG_SZ, 'GpuPreference=2;')
+        print(f"[GPU] 고성능 GPU 자동 설정: {Path(exe_path).name}")
+    except Exception as e:
+        print(f"[GPU] 고성능 설정 실패: {e}")
+
+def _apply_gpu_preferences():
+    """Set discrete GPU preference for all Ollama executables found."""
+    if sys.platform != 'win32':
+        return
+    bin_dir = Path("./bin")
+    candidates = [
+        shutil.which('ollama'),
+        str((bin_dir / 'ollama.exe').resolve()) if (bin_dir / 'ollama.exe').exists() else None,
+        str((bin_dir / 'lib' / 'ollama' / 'llama-server.exe').resolve())
+            if (bin_dir / 'lib' / 'ollama' / 'llama-server.exe').exists() else None,
+    ]
+    for exe in candidates:
+        if exe:
+            _set_gpu_high_perf(exe)
+
+
 def start_local_ollama():
     global _amd_mode
 
@@ -83,6 +111,8 @@ def start_local_ollama():
         _amd_mode = True
         print("[AI] AMD/Radeon GPU 감지 — AI 기능 미지원 (STT는 정상 동작)")
         return
+
+    _apply_gpu_preferences()
 
     def pull_gemma_model():
         try:
@@ -214,6 +244,7 @@ def start_local_ollama():
         try:
             with urllib.request.urlopen("http://localhost:11434/", timeout=1):
                 print("[Ollama] Daemon ready.")
+                _apply_gpu_preferences()  # llama-server.exe 다운로드 후 경로 재등록
                 pull_gemma_model()
                 return
         except Exception:
