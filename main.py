@@ -123,7 +123,7 @@ def start_local_ollama():
         except Exception as e:
             print(f"[Ollama Error] Failed to pull model: {e}")
 
-    _ollama_env = {**os.environ, 'OLLAMA_NUM_GPU': '0'}
+    _ollama_env = os.environ.copy()
 
     if sys.platform == 'win32':
         try:

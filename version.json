@@ -1,5 +1,5 @@
 {
-  "server_version": "1.1.1",
+  "server_version": "1.1.2",
   "launcher_version": "1.1.0",
-  "release_notes": "Windows: 시스템 Python 탐색 완전 제거, 전용 embeddable Python만 사용 (경로 충돌 근본 해결)"
+  "release_notes": "NVIDIA GPU 복구: OLLAMA_NUM_GPU=0 제거로 GPU 가속 정상 작동"
 }
