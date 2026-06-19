@@ -1,5 +1,5 @@
 {
-  "server_version": "1.0.9",
-  "launcher_version": "1.0.2",
-  "release_notes": "AMD STT전용 처리 복귀 + Python 자동설치 고정경로(python311) 개선"
+  "server_version": "1.1.0",
+  "launcher_version": "1.0.4",
+  "release_notes": "사전 버그 수정: 패치 실패 시 버전 유지, setup 오류 표시, pip stderr 로깅, 포트 다중 종료, stdout BrokenPipe 방지"
 }

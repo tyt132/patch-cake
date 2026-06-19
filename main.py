@@ -8,8 +8,11 @@ import threading
 import time
 import urllib.request
 import urllib.error
+import ssl
 from contextlib import asynccontextmanager
 from pathlib import Path
+
+ssl._create_default_https_context = ssl._create_unverified_context  # school network SSL bypass
 
 from fastapi import FastAPI, UploadFile, File, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -109,9 +112,14 @@ def start_local_ollama():
 
         print(f"\n[Ollama] gemma4:e2b not found. Pulling via CLI ({ollama_bin})...")
         try:
-            result = subprocess.run([ollama_bin, "pull", "gemma4:e2b"], check=True)
+            result = subprocess.run(
+                [ollama_bin, "pull", "gemma4:e2b"],
+                check=True, timeout=3600  # 1 hour max — large model on slow network
+            )
             if result.returncode == 0:
                 print("[Ollama] gemma4:e2b pulled successfully.")
+        except subprocess.TimeoutExpired:
+            print("[Ollama Warning] Model pull timed out after 1 hour.")
         except Exception as e:
             print(f"[Ollama Error] Failed to pull model: {e}")
 
@@ -350,8 +358,11 @@ def ai_analyze(payload: AnalyzeRequest):
                         decoded = line.decode("utf-8", errors="replace").strip()
                         data = json.loads(decoded)
                         token = data.get("response", "")
-                        sys.stdout.write(token)
-                        sys.stdout.flush()
+                        try:
+                            sys.stdout.write(token)
+                            sys.stdout.flush()
+                        except Exception:
+                            pass
                         yield (decoded + "\n").encode("utf-8")
                         if data.get("done", False):
                             break
