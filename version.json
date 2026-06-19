@@ -1,5 +1,5 @@
 {
   "server_version": "1.1.0",
-  "launcher_version": "1.0.4",
-  "release_notes": "사전 버그 수정: 패치 실패 시 버전 유지, setup 오류 표시, pip stderr 로깅, 포트 다중 종료, stdout BrokenPipe 방지"
+  "launcher_version": "1.0.5",
+  "release_notes": "학교 네트워크 SSL 우회: pip 설치 시 --trusted-host 적용, urllib SSL 검증 비활성화"
 }
