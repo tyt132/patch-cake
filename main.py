@@ -21,17 +21,7 @@ from stt_service import transcribe_audio
 UPLOAD_DIR = Path("./uploads/stt")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
-# AMD path globals
-_amd_mode = False
-_llama_model = None
-_llama_model_ready = False
-
-GGUF_FILENAME = "Qwen2.5-1.5B-Instruct-Q4_K_M.gguf"
-GGUF_URL = (
-    "https://huggingface.co/bartowski/Qwen2.5-1.5B-Instruct-GGUF"
-    "/resolve/main/Qwen2.5-1.5B-Instruct-Q4_K_M.gguf"
-)
-GGUF_PATH = Path("./models") / GGUF_FILENAME
+_amd_mode = False   # True when AMD/Radeon GPU detected — AI disabled, STT only
 
 ALLOWED_ORIGINS = [
     "https://sths-sms.vercel.app",
@@ -41,30 +31,27 @@ ALLOWED_ORIGINS = [
 ]
 
 
-# ── AMD path ──────────────────────────────────────────────────────────────────
-
 def _detect_amd() -> bool:
     if sys.platform != 'win32':
         return False
 
-    def _check(output: str) -> bool:
-        low = output.lower()
-        return 'amd' in low or 'radeon' in low
+    def _has_amd(text: str) -> bool:
+        t = text.lower()
+        return 'amd' in t or 'radeon' in t
 
-    # Method 1: wmic
+    # wmic
     try:
         r = subprocess.run(
             ['wmic', 'path', 'win32_VideoController', 'get', 'name'],
             capture_output=True, text=True, creationflags=0x08000000, timeout=5
         )
         print(f"[AI] GPU 감지 (wmic): {r.stdout.strip()}")
-        if r.stdout.strip():
-            if _check(r.stdout):
-                return True
+        if r.stdout.strip() and _has_amd(r.stdout):
+            return True
     except Exception as e:
         print(f"[AI] wmic 실패: {e}")
 
-    # Method 2: PowerShell fallback
+    # PowerShell fallback
     try:
         r = subprocess.run(
             ['powershell', '-NoProfile', '-Command',
@@ -72,12 +59,12 @@ def _detect_amd() -> bool:
             capture_output=True, text=True, creationflags=0x08000000, timeout=8
         )
         print(f"[AI] GPU 감지 (PS): {r.stdout.strip()}")
-        if _check(r.stdout):
+        if _has_amd(r.stdout):
             return True
     except Exception as e:
         print(f"[AI] PowerShell 실패: {e}")
 
-    # Method 3: AMD driver folder
+    # AMD driver folder
     for folder in [Path("C:/Program Files/AMD"), Path("C:/Program Files (x86)/AMD")]:
         if folder.exists():
             print(f"[AI] AMD 드라이버 폴더 감지: {folder}")
@@ -86,85 +73,14 @@ def _detect_amd() -> bool:
     return False
 
 
-def _init_llama_cpp():
-    global _llama_model, _llama_model_ready
+def start_local_ollama():
+    global _amd_mode
 
-    # 1. Install llama-cpp-python (CPU-only wheel) if missing
-    try:
-        import llama_cpp  # noqa: F401
-        print("[AMD-AI] llama-cpp-python 이미 설치됨.")
-    except ImportError:
-        print("[AMD-AI] llama-cpp-python 설치 중 (최초 1회)...")
-        installed = False
-        # Try 1: PyPI pre-built binary (Windows CPU wheel available on PyPI)
-        try:
-            subprocess.run(
-                [sys.executable, '-m', 'pip', 'install',
-                 'llama-cpp-python', '--only-binary', ':all:', '--quiet'],
-                check=True,
-            )
-            installed = True
-            print("[AMD-AI] llama-cpp-python 설치 완료 (PyPI binary).")
-        except Exception as e1:
-            print(f"[AMD-AI] PyPI binary 실패: {e1}")
-        # Try 2: CPU-specific wheel index
-        if not installed:
-            try:
-                subprocess.run(
-                    [sys.executable, '-m', 'pip', 'install',
-                     'llama-cpp-python',
-                     '--extra-index-url',
-                     'https://abetlen.github.io/llama-cpp-python/whl/cpu',
-                     '--quiet'],
-                    check=True,
-                )
-                installed = True
-                print("[AMD-AI] llama-cpp-python 설치 완료 (CPU index).")
-            except Exception as e2:
-                print(f"[AMD-AI] CPU index 실패: {e2}")
-        if not installed:
-            print("[AMD-AI Error] llama-cpp-python 설치 실패. AI 기능을 사용할 수 없습니다.")
-            return
+    if _detect_amd():
+        _amd_mode = True
+        print("[AI] AMD/Radeon GPU 감지 — AI 기능 미지원 (STT는 정상 동작)")
+        return
 
-    # 2. Download GGUF model if not present
-    GGUF_PATH.parent.mkdir(exist_ok=True)
-    if not GGUF_PATH.exists():
-        print(f"[AMD-AI] 모델 다운로드 중... (약 1.1GB, 시간이 걸립니다)")
-        tmp_path = GGUF_PATH.with_suffix('.tmp')
-        try:
-            def _progress(block, block_size, total):
-                if total > 0 and block % 200 == 0:
-                    mb = block * block_size // 1024 // 1024
-                    total_mb = total // 1024 // 1024
-                    print(f"[AMD-AI] 다운로드 중... {mb}MB / {total_mb}MB")
-            urllib.request.urlretrieve(GGUF_URL, str(tmp_path), reporthook=_progress)
-            tmp_path.rename(GGUF_PATH)
-            print("[AMD-AI] 모델 다운로드 완료.")
-        except Exception as e:
-            print(f"[AMD-AI Error] 모델 다운로드 실패: {e}")
-            if tmp_path.exists():
-                tmp_path.unlink()
-            return
-
-    # 3. Load model into memory
-    print("[AMD-AI] 모델 로딩 중...")
-    try:
-        from llama_cpp import Llama
-        _llama_model = Llama(
-            model_path=str(GGUF_PATH),
-            n_ctx=4096,
-            n_gpu_layers=0,   # CPU only — no GPU involvement
-            verbose=False,
-        )
-        _llama_model_ready = True
-        print("[AMD-AI] 모델 로딩 완료. AI 기능 준비됨.")
-    except Exception as e:
-        print(f"[AMD-AI Error] 모델 로딩 실패: {e}")
-
-
-# ── Ollama path ───────────────────────────────────────────────────────────────
-
-def _start_ollama():
     def pull_gemma_model():
         try:
             req = urllib.request.Request("http://localhost:11434/api/tags")
@@ -201,7 +117,6 @@ def _start_ollama():
 
     _ollama_env = {**os.environ, 'OLLAMA_NUM_GPU': '0'}
 
-    # Kill any existing Ollama on Windows so our env vars take effect
     if sys.platform == 'win32':
         try:
             subprocess.run(
@@ -284,21 +199,9 @@ def _start_ollama():
     print("[Ollama Warning] Startup confirmation timed out.")
 
 
-# ── Backend selector ──────────────────────────────────────────────────────────
-
-def setup_ai_backend():
-    global _amd_mode
-    if _detect_amd():
-        _amd_mode = True
-        print("[AI] AMD/Radeon GPU 감지 — llama-cpp-python CPU 모드로 실행합니다.")
-        _init_llama_cpp()
-    else:
-        _start_ollama()
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    threading.Thread(target=setup_ai_backend, daemon=True).start()
+    threading.Thread(target=start_local_ollama, daemon=True).start()
     yield
 
 
@@ -316,8 +219,6 @@ app.add_middleware(
 class AnalyzeRequest(BaseModel):
     content: str
 
-
-# ── STT endpoints ─────────────────────────────────────────────────────────────
 
 @app.get("/api/stt/ping")
 async def ping():
@@ -356,15 +257,13 @@ async def transcribe(
                 pass
 
 
-# ── AI endpoints ──────────────────────────────────────────────────────────────
-
 @app.get("/api/ai/status")
 def ai_status():
     if _amd_mode:
         return {
-            "ollama_running": _llama_model_ready,
-            "has_model": _llama_model_ready,
-            "amd_mode": True,
+            "ollama_running": False,
+            "has_model": False,
+            "error": "AMD/Radeon GPU는 AI 기능을 지원하지 않습니다. STT 기능은 정상 이용 가능합니다."
         }
     try:
         req = urllib.request.Request("http://localhost:11434/api/tags")
@@ -386,11 +285,9 @@ def ai_status():
 @app.post("/api/ai/pull")
 def ai_pull():
     if _amd_mode:
-        # Model is auto-downloaded by _init_llama_cpp; nothing to pull here
-        def _noop():
-            yield (json.dumps({"status": "AMD 모드: 모델이 자동으로 다운로드됩니다.",
-                               "done": True}) + "\n").encode("utf-8")
-        return StreamingResponse(_noop(), media_type="application/x-ndjson")
+        def _unsupported():
+            yield (json.dumps({"error": "AMD/Radeon GPU는 AI 기능을 지원하지 않습니다."}) + "\n").encode("utf-8")
+        return StreamingResponse(_unsupported(), media_type="application/x-ndjson")
 
     def generate_pull_progress():
         try:
@@ -414,58 +311,13 @@ def ai_pull():
 
 @app.post("/api/ai/analyze")
 def ai_analyze(payload: AnalyzeRequest):
-    system_msg = (
-        "당신은 전문적인 학교 상담 교사입니다. "
-        "반드시 아래 형식으로만 답변하고 다른 말은 생략하십시오.\n\n"
-        "[상담 요약]\n- 요약 내용 1\n- 요약 내용 2\n- 요약 내용 3\n\n"
-        "[추후 지도 계획]\n- 계획 내용 1\n- 계획 내용 2"
-    )
-    user_msg = (
-        "다음 상담 기록을 바탕으로 상담 요약(3~4개 항목)과 "
-        "추후 지도 계획(2~3개 항목)을 위 형식으로 작성해주세요.\n\n"
-        f"상담 기록:\n{payload.content}"
-    )
-
-    # ── AMD path: llama-cpp-python ────────────────────────────────────────────
     if _amd_mode:
-        def generate_llama_stream():
-            if not _llama_model_ready:
-                yield (json.dumps({
-                    "error": "AI 모델 로딩 중입니다. 잠시 후 다시 시도하세요."
-                }) + "\n").encode("utf-8")
-                return
-            print("\n[AMD-AI] 분석 요청 수신. 생성 중...\n")
-            try:
-                stream = _llama_model.create_chat_completion(
-                    messages=[
-                        {"role": "system", "content": system_msg},
-                        {"role": "user",   "content": user_msg},
-                    ],
-                    max_tokens=1024,
-                    temperature=0.7,
-                    stream=True,
-                )
-                for chunk in stream:
-                    delta = chunk["choices"][0]["delta"]
-                    token = delta.get("content", "")
-                    finish = chunk["choices"][0]["finish_reason"]
-                    done = finish is not None
-                    if token:
-                        sys.stdout.write(token)
-                        sys.stdout.flush()
-                    yield (json.dumps({"response": token, "done": done}) + "\n").encode("utf-8")
-                    if done:
-                        break
-                print("\n\n[AMD-AI] 생성 완료.")
-            except Exception as e:
-                print(f"\n[AMD-AI Error] {e}")
-                yield (json.dumps({"error": str(e)}) + "\n").encode("utf-8")
+        def _unsupported():
+            yield (json.dumps({"error": "AMD/Radeon GPU는 AI 기능을 지원하지 않습니다."}) + "\n").encode("utf-8")
+        return StreamingResponse(_unsupported(), media_type="application/x-ndjson")
 
-        return StreamingResponse(generate_llama_stream(), media_type="application/x-ndjson")
-
-    # ── Ollama path ───────────────────────────────────────────────────────────
     prompt = (
-        f"당신은 전문적인 학교 상담 교사입니다. 다음 상담 기록 대화 요지 및 관찰 내용을 바탕으로 두 가지를 작성해 주세요.\n"
+        "당신은 전문적인 학교 상담 교사입니다. 다음 상담 기록 대화 요지 및 관찰 내용을 바탕으로 두 가지를 작성해 주세요.\n"
         "1. 상담 요약 (핵심적인 내용을 3~4개의 글머리 기호 문장으로 요약)\n"
         "2. 추후 지도 계획 (Action Plan) (구체적이고 실천 가능한 학생 관리 및 지도 방안을 2~3개 제시)\n\n"
         "반드시 아래와 같은 형식(양식)으로 답변해 주십시오. 다른 안내 문구나 서론, 결론은 생략하십시오.\n\n"
@@ -514,7 +366,6 @@ def ai_analyze(payload: AnalyzeRequest):
 
 
 if __name__ == "__main__":
-    # Kill any stale process on port 8000 before uvicorn binds (prevents Errno 10048)
     if sys.platform == 'win32':
         try:
             _r = subprocess.run(
