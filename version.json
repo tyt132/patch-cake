@@ -1,5 +1,5 @@
 {
   "server_version": "1.1.1",
-  "launcher_version": "1.0.8",
-  "release_notes": "Python 자동설치 폴백: TargetDir 무시 시 기본경로 스캔, 에러 메시지 개선"
+  "launcher_version": "1.1.0",
+  "release_notes": "Windows: 시스템 Python 탐색 완전 제거, 전용 embeddable Python만 사용 (경로 충돌 근본 해결)"
 }
