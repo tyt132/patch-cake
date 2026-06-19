@@ -143,10 +143,26 @@ def start_local_ollama():
     except Exception:
         pass
 
+    def _popen_ollama(cmd):
+        """Start Ollama and log GPU-related lines from its stderr."""
+        proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL,
+                                stderr=subprocess.PIPE, env=_ollama_env)
+        def _read_stderr():
+            _GPU_KEYWORDS = ('cuda', 'gpu', 'vram', 'nvidia', 'metal',
+                             'rocm', 'offload', 'device', 'compute')
+            try:
+                for raw in proc.stderr:
+                    line = raw.decode('utf-8', errors='replace').strip()
+                    if line and any(kw in line.lower() for kw in _GPU_KEYWORDS):
+                        print(f"[Ollama GPU] {line}")
+            except Exception:
+                pass
+        threading.Thread(target=_read_stderr, daemon=True).start()
+        return proc
+
     print("[Ollama] Starting local Ollama...")
     try:
-        subprocess.Popen(["ollama", "serve"], stdout=subprocess.DEVNULL,
-                         stderr=subprocess.DEVNULL, env=_ollama_env)
+        _popen_ollama(["ollama", "serve"])
         for _ in range(5):
             time.sleep(1)
             try:
@@ -173,8 +189,7 @@ def start_local_ollama():
             except Exception as e:
                 print(f"[Ollama Error] Download failed: {e}")
                 return
-        subprocess.Popen([str(ollama_bin), "serve"], stdout=subprocess.DEVNULL,
-                         stderr=subprocess.DEVNULL, env=_ollama_env)
+        _popen_ollama([str(ollama_bin), "serve"])
 
     elif sys.platform == "win32":
         ollama_bin = bin_dir / "ollama.exe"
@@ -192,8 +207,7 @@ def start_local_ollama():
             except Exception as e:
                 print(f"[Ollama Error] Setup failed: {e}")
                 return
-        subprocess.Popen([str(ollama_bin), "serve"], stdout=subprocess.DEVNULL,
-                         stderr=subprocess.DEVNULL, env=_ollama_env)
+        _popen_ollama([str(ollama_bin), "serve"])
 
     for _ in range(15):
         time.sleep(1)
@@ -369,6 +383,21 @@ def ai_analyze(payload: AnalyzeRequest):
                     except Exception as inner_e:
                         print(f"\n[Ollama Warning] JSON parse error: {inner_e}")
             print("\n\n[Ollama] AI Generation completed successfully.")
+            try:
+                ps_req = urllib.request.Request("http://localhost:11434/api/ps")
+                with urllib.request.urlopen(ps_req, timeout=2) as ps_resp:
+                    ps_data = json.loads(ps_resp.read().decode())
+                    for m in ps_data.get("models", []):
+                        size_vram = m.get("size_vram", 0)
+                        size_total = m.get("size", 1)
+                        if size_vram and size_vram > 1_000_000:
+                            pct = int(size_vram / size_total * 100)
+                            print(f"[Ollama GPU] {m.get('name','')} — "
+                                  f"VRAM {size_vram/1e9:.2f}GB / {size_total/1e9:.2f}GB ({pct}% GPU)")
+                        else:
+                            print(f"[Ollama GPU] {m.get('name','')} — CPU 전용")
+            except Exception:
+                pass
         except Exception as e:
             print(f"\n[Ollama Error] Failed to generate AI analysis: {e}")
             yield (json.dumps({"error": str(e)}) + "\n").encode("utf-8")
