@@ -1,5 +1,5 @@
 {
   "server_version": "1.1.0",
-  "launcher_version": "1.0.5",
-  "release_notes": "학교 네트워크 SSL 우회: pip 설치 시 --trusted-host 적용, urllib SSL 검증 비활성화"
+  "launcher_version": "1.0.6",
+  "release_notes": "바탕화면 바로가기 수정: OneDrive 등 경로 리다이렉션 환경 대응, pip SSL 우회"
 }
