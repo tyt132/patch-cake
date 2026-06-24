@@ -1,5 +1,5 @@
 {
   "server_version": "1.1.4",
-  "launcher_version": "1.1.1",
-  "release_notes": "NVIDIA GPU 자동 설정: 레지스트리로 ollama/llama-server 고성능 GPU 자동 등록"
+  "launcher_version": "1.1.2",
+  "release_notes": "재설치 시 누락 파일 자동 복구 (_MEIPASS 번들에서 복원)"
 }
